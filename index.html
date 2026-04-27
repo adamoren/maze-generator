@@ -337,7 +337,7 @@
       <div class="algo-option selected" data-algo="prim">
         <canvas id="previewPrim" width="80" height="80"></canvas>
         <strong>🌿 Wild</strong>
-        <p>Lots of branches — hard to guess which path leads out</p>
+        <p>Many branches of similar length — hard to tell which one leads out</p>
       </div>
       <div class="algo-option" data-algo="dfs">
         <canvas id="previewDfs" width="80" height="80"></canvas>
@@ -365,44 +365,45 @@ function generateMaze(cols, rows) {
   return currentAlgo === 'prim' ? generateMazePrims(cols, rows) : generateMazeDFS(cols, rows);
 }
 
+// Growing Tree: bias=1 → always newest cell (DFS-like, long corridors)
+//               bias=0 → always random cell (Prim's-like, very bushy)
+//               bias=0.5 → mix: medium corridors with believable branches
 function generateMazePrims(cols, rows) {
+  const BIAS    = 0.5;
   const visited   = Array.from({length: rows}, () => new Uint8Array(cols));
   const southWall = Array.from({length: rows - 1}, () => new Uint8Array(cols).fill(1));
   const eastWall  = Array.from({length: rows},     () => new Uint8Array(cols - 1).fill(1));
 
-  const walls = [];
-  function addWalls(x, y) {
-    if (x + 1 < cols) walls.push(x, y, 0);
-    if (x - 1 >= 0)   walls.push(x, y, 1);
-    if (y + 1 < rows) walls.push(x, y, 2);
-    if (y - 1 >= 0)   walls.push(x, y, 3);
-  }
-
+  const active = [[0, 0]];
   visited[0][0] = 1;
-  addWalls(0, 0);
 
-  while (walls.length > 0) {
-    const pick = Math.floor(Math.random() * (walls.length / 3)) * 3;
-    const x = walls[pick], y = walls[pick + 1], dir = walls[pick + 2];
-    // swap-and-pop (O(1) removal)
-    walls[pick] = walls[walls.length - 3]; walls[pick + 1] = walls[walls.length - 2]; walls[pick + 2] = walls[walls.length - 1];
-    walls.length -= 3;
+  while (active.length > 0) {
+    const idx = Math.random() < BIAS
+      ? active.length - 1
+      : Math.floor(Math.random() * active.length);
 
+    const [x, y] = active[idx];
+    const nb = [];
+    if (x + 1 < cols && !visited[y][x+1]) nb.push(0);
+    if (x - 1 >= 0  && !visited[y][x-1]) nb.push(1);
+    if (y + 1 < rows && !visited[y+1][x]) nb.push(2);
+    if (y - 1 >= 0  && !visited[y-1][x]) nb.push(3);
+
+    if (nb.length === 0) {
+      active[idx] = active[active.length - 1];
+      active.pop();
+      continue;
+    }
+
+    const dir = nb[Math.floor(Math.random() * nb.length)];
     let nx = x, ny = y;
-    if      (dir === 0) nx = x + 1;
-    else if (dir === 1) nx = x - 1;
-    else if (dir === 2) ny = y + 1;
-    else                ny = y - 1;
-
-    if (visited[ny][nx]) continue;
-
-    if      (dir === 0) eastWall[y][x]    = 0;
-    else if (dir === 1) eastWall[y][x-1]  = 0;
-    else if (dir === 2) southWall[y][x]   = 0;
-    else                southWall[y-1][x] = 0;
+    if      (dir === 0) { eastWall[y][x]    = 0; nx = x+1; }
+    else if (dir === 1) { eastWall[y][x-1]  = 0; nx = x-1; }
+    else if (dir === 2) { southWall[y][x]   = 0; ny = y+1; }
+    else                { southWall[y-1][x] = 0; ny = y-1; }
 
     visited[ny][nx] = 1;
-    addWalls(nx, ny);
+    active.push([nx, ny]);
   }
 
   return { southWall, eastWall };
