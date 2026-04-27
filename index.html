@@ -307,7 +307,7 @@
   </div>
 </div>
 
-<div id="mazeOuter" style="position:relative;display:none">
+<div id="mazeOuter" style="position:relative;display:none;width:fit-content">
   <div class="canvas-wrap" id="canvasWrap">
     <canvas id="maze"></canvas>
     <canvas id="trail" style="position:absolute;top:0;left:0;pointer-events:none"></canvas>
@@ -652,7 +652,7 @@ overlay.addEventListener('click', () => {
 function draw(level) {
   const cols = Math.round(2 + level * 0.4);
   const rows = cols;
-  const maxCanvas = window.innerWidth - 48;
+  const maxCanvas = Math.min(window.innerWidth - 80, 1100);
   const cell = Math.min(80, Math.max(4, Math.floor(maxCanvas / cols)));
   const W = cols * cell;
   const H = rows * cell;
