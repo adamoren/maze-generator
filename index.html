@@ -688,21 +688,23 @@ printBtn.addEventListener('click', () => {
   }
   const colorPrint = document.getElementById('colorCheck').checked;
 
-  const fontSize = Math.max(14, cell * 0.6);
-  const labelH   = Math.ceil(fontSize * 2.5);
-
   const pc = document.createElement('canvas');
-  const scale = Math.min(3, Math.max(1, Math.floor(2400 / W)));
-  pc.width  = W * scale;
-  pc.height = (H + labelH) * scale;
+  const scale    = Math.min(3, Math.max(1, Math.floor(2400 / W)));
+  const imgW     = W * scale;
+  const imgH     = H * scale;
+  const fontSize = Math.round(imgW * 0.022);
+  const labelH   = Math.ceil(fontSize * 2.2);
+  pc.width  = imgW;
+  pc.height = imgH + labelH;
   const pctx = pc.getContext('2d');
   pctx.scale(scale, scale);
   renderMaze(pctx, W, H, cell, maze.southWall, maze.eastWall, true, colorPrint);
 
+  pctx.setTransform(1, 0, 0, 1, 0, 0);
   pctx.fillStyle = colorPrint ? '#6d28d9' : '#444';
   pctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
   pctx.textAlign = 'center';
-  pctx.fillText(`Maze #${level}`, W / 2, H + labelH * 0.65);
+  pctx.fillText(`Maze #${level}`, imgW / 2, imgH + labelH * 0.65);
 
   document.getElementById('printImg').src = pc.toDataURL('image/png');
   window.print();
