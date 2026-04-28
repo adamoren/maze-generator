@@ -692,8 +692,9 @@ printBtn.addEventListener('click', () => {
   const scale    = Math.min(3, Math.max(1, Math.floor(2400 / W)));
   const imgW     = W * scale;
   const imgH     = H * scale;
-  const fontSize = Math.round(imgW * 0.022);
-  const labelH   = Math.ceil(fontSize * 2.2);
+  const fontSize    = Math.round(imgW * 0.022);
+  const strokeBleed = Math.ceil(Math.max(1, cell * 0.12) * scale / 2);
+  const labelH      = strokeBleed + Math.ceil(fontSize * 2);
   pc.width  = imgW;
   pc.height = imgH + labelH;
   const pctx = pc.getContext('2d');
@@ -704,7 +705,7 @@ printBtn.addEventListener('click', () => {
   pctx.fillStyle = colorPrint ? '#6d28d9' : '#444';
   pctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
   pctx.textAlign = 'center';
-  pctx.fillText(`Maze #${level}`, imgW / 2, imgH + labelH * 0.65);
+  pctx.fillText(`Maze #${level}`, imgW / 2, imgH + strokeBleed + fontSize);
 
   document.getElementById('printImg').src = pc.toDataURL('image/png');
   window.print();
