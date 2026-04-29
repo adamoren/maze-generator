@@ -448,12 +448,12 @@ function setName(name) {
   loadHistory();
 }
 
-async function recordSolve(level, timeSeconds) {
+async function recordSolve(level, timeSeconds, moveCount) {
   if (!playerName) return;
   await fetch(API, {
     method: 'POST',
     headers: HEADERS,
-    body: JSON.stringify({ player_name: playerName, level, time_seconds: timeSeconds })
+    body: JSON.stringify({ player_name: playerName, level, time_seconds: timeSeconds, move_count: moveCount })
   });
   loadHistory();
 }
@@ -480,6 +480,7 @@ async function loadHistory() {
     return `<div class="history-row">
       <span class="hl">Maze #${r.level}</span>
       <span class="ht">⏱ ${time}</span>
+      <span class="ht">👟 ${r.move_count} moves</span>
       <span class="hr">${date}</span>
     </div>`;
   }).join('')}</div>`;
@@ -505,6 +506,7 @@ const canvas   = document.getElementById('maze');
 const ctx      = canvas.getContext('2d');
 const overlay  = document.getElementById('overlay');
 let mazeStartTime = null;
+let moveCount = 0;
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
@@ -768,6 +770,7 @@ document.addEventListener('keydown', e => {
   else return;
 
   e.preventDefault();
+  moveCount++;
   const prev = playerPos;
   playerPos = { x, y };
 
@@ -789,7 +792,7 @@ document.addEventListener('keydown', e => {
   if (x === cols - 1 && y === rows - 1) {
     playerPos = null;
     const elapsed = mazeStartTime ? Math.round((Date.now() - mazeStartTime) / 1000) : 0;
-    recordSolve(lastMazeData.level, elapsed);
+    recordSolve(lastMazeData.level, elapsed, moveCount);
     overlay.textContent = '🎉 Solved! Click to dismiss';
     overlay.classList.add('visible');
   }
@@ -824,6 +827,7 @@ function draw(level) {
     renderMaze(ctx, W, H, cell, maze.southWall, maze.eastWall, false, false);
     initPlayer();
     mazeStartTime = Date.now();
+    moveCount = 0;
 
     overlay.classList.remove('visible');
     genBtn.disabled   = false;
