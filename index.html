@@ -793,7 +793,18 @@ document.addEventListener('keydown', e => {
     playerPos = null;
     const elapsed = mazeStartTime ? Math.round((Date.now() - mazeStartTime) / 1000) : 0;
     recordSolve(lastMazeData.level, elapsed, moveCount);
-    overlay.textContent = '🎉 Solved! Click to dismiss';
+    const puns = [
+      '🌟 A-MAZE-ing!', '✨ Mazemerizing!', '🏆 Un-be-MAZE-able!',
+      '🎊 Corridor-ulations!', '🚪 Exit-cellent work!', '🧱 Wall done!',
+      '🌽 You maize me every time!', '🗺️ Lost? Never heard of her!',
+      '🧭 Path-ological genius!', '🌿 Hedge-s off to you!',
+      '🎉 MAZE-nificent!', '💪 No dead ends for you!',
+      '🔓 Labyrinth? More like lab-irin-DONE!', '⭐ That was in-CRED-ible!',
+      '🏅 You really WALLED it!', '📍 Straight to the point… eventually!',
+      '🛤️ A true path-finder!', '🌀 You spiraled straight to victory!',
+      '🎯 Dead-end dodger extraordinaire!', '🤯 That was TURN-mendous!',
+    ];
+    overlay.textContent = puns[Math.floor(Math.random() * puns.length)] + ' Click to dismiss';
     overlay.classList.add('visible');
   }
 });
