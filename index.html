@@ -399,6 +399,12 @@
   <button id="zoomOutBtn" style="position:absolute;bottom:16px;right:16px;z-index:20;display:none;background:rgba(30,27,74,0.82);color:white;border:none;border-radius:999px;padding:9px 20px;font-size:0.85rem;font-weight:700;cursor:pointer;box-shadow:0 2px 14px rgba(0,0,0,0.35);backdrop-filter:blur(6px)">↙ Zoom out</button>
 </div>
 
+<div id="recordStrip" style="display:none;font-size:0.82rem;color:#6d6a85;margin-top:10px;display:none;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center">
+  <span>🏆 To beat:</span>
+  <span id="recordTime" style="color:#7c3aed;font-weight:600"></span>
+  <span id="recordMoves" style="color:#7c3aed;font-weight:600"></span>
+</div>
+
 <div class="legend" id="legend" style="display:none">
   <div class="legend-item"><div class="dot dot-start"></div> Start</div>
   <div class="legend-item"><div class="dot dot-end"></div> Finish</div>
@@ -462,6 +468,28 @@ function setName(name) {
   loadHistory();
 }
 
+async function showLevelRecord(level) {
+  const strip = document.getElementById('recordStrip');
+  document.getElementById('recordTime').textContent  = '⏱ —';
+  document.getElementById('recordMoves').textContent = '👟 —';
+  strip.style.display = 'flex';
+  if (!playerName) return;
+  const res = await fetch(
+    `${API}?player_name=eq.${encodeURIComponent(playerName)}&level=eq.${level}&select=time_seconds,move_count`,
+    { headers: HEADERS }
+  );
+  const rows = await res.json();
+  if (!rows.length) {
+    document.getElementById('recordTime').textContent  = '⏱ no record yet';
+    document.getElementById('recordMoves').textContent = '👟 no record yet';
+    return;
+  }
+  const bestTime  = Math.min(...rows.map(r => r.time_seconds));
+  const bestMoves = Math.min(...rows.map(r => r.move_count));
+  document.getElementById('recordTime').textContent  = `⏱ ${fmtTime(bestTime)}`;
+  document.getElementById('recordMoves').textContent = `👟 ${bestMoves} moves`;
+}
+
 function fmtTime(s) {
   const m = Math.floor(s / 60);
   return m ? `${m}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
@@ -486,6 +514,7 @@ async function recordSolve(level, timeSeconds, moveCount) {
     body: JSON.stringify({ player_name: playerName, level, time_seconds: timeSeconds, move_count: moveCount })
   });
   loadHistory();
+  if (newTimeRecord || newMovesRecord) showLevelRecord(level);
   return { newTimeRecord, newMovesRecord, firstSolve };
 }
 
@@ -903,6 +932,7 @@ function draw(level) {
     initPlayer();
     mazeStartTime = Date.now();
     moveCount = 0;
+    showLevelRecord(level);
 
     overlay.classList.remove('visible');
     genBtn.disabled   = false;
@@ -1063,6 +1093,7 @@ genBtn.addEventListener('click', () => {
   document.getElementById('welcome').style.display = 'none';
   document.getElementById('mazeOuter').style.display = '';
   document.getElementById('legend').style.display = '';
+  document.getElementById('recordStrip').style.display = 'flex';
 
   draw(v);
 });
