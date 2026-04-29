@@ -326,6 +326,9 @@
   <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.85rem;color:#6d6a85;text-transform:none;letter-spacing:normal;margin-left:4px">
     <input type="checkbox" id="colorCheck"> Color print
   </label>
+  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.85rem;color:#6d6a85;text-transform:none;letter-spacing:normal">
+    <input type="checkbox" id="trailCheck"> Include path
+  </label>
 </div>
 
 <div id="settingsModal" style="display:none">
@@ -692,20 +695,58 @@ printBtn.addEventListener('click', () => {
   const scale    = Math.min(3, Math.max(1, Math.floor(2400 / W)));
   const imgW     = W * scale;
   const imgH     = H * scale;
-  const fontSize    = Math.round(imgW * 0.035);
+  const fontSize    = Math.round(imgW * 0.07);
   const strokeBleed = Math.ceil(Math.max(1, cell * 0.12) * scale / 2);
-  const labelH      = strokeBleed + Math.ceil(fontSize * 2);
+  const labelH      = strokeBleed + Math.ceil(fontSize * 1.6);
   pc.width  = imgW;
   pc.height = imgH + labelH;
   const pctx = pc.getContext('2d');
+
+  pctx.fillStyle = 'white';
+  pctx.fillRect(0, 0, imgW, labelH);
+  pctx.fillStyle = colorPrint ? '#6d28d9' : '#111';
+  pctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
+  pctx.textAlign = 'center';
+  pctx.fillText(`Maze #${level}`, imgW / 2, labelH - strokeBleed - fontSize * 0.2);
+
+  pctx.translate(0, labelH);
   pctx.scale(scale, scale);
   renderMaze(pctx, W, H, cell, maze.southWall, maze.eastWall, true, colorPrint);
 
-  pctx.setTransform(1, 0, 0, 1, 0, 0);
-  pctx.fillStyle = colorPrint ? '#6d28d9' : '#444';
-  pctx.font = `bold ${fontSize}px 'Segoe UI', system-ui, sans-serif`;
-  pctx.textAlign = 'center';
-  pctx.fillText(`Maze #${level}`, imgW / 2, imgH + strokeBleed + fontSize);
+  if (document.getElementById('trailCheck').checked) {
+    const lw = Math.max(1, cell * 0.28);
+
+    if (deadSegments.length > 0) {
+      pctx.strokeStyle = 'rgba(148,163,184,0.55)';
+      pctx.lineWidth = lw;
+      pctx.lineCap = 'round';
+      pctx.beginPath();
+      for (const s of deadSegments) {
+        pctx.moveTo(s.from.x * cell + cell * 0.5, s.from.y * cell + cell * 0.5);
+        pctx.lineTo(s.to.x   * cell + cell * 0.5, s.to.y   * cell + cell * 0.5);
+      }
+      pctx.stroke();
+    }
+
+    if (pathStack.length > 1) {
+      pctx.strokeStyle = colorPrint ? '#d97706' : '#444';
+      pctx.lineWidth = lw;
+      pctx.lineCap = 'round';
+      pctx.lineJoin = 'round';
+      pctx.beginPath();
+      pctx.moveTo(pathStack[0].x * cell + cell * 0.5, pathStack[0].y * cell + cell * 0.5);
+      for (let i = 1; i < pathStack.length; i++)
+        pctx.lineTo(pathStack[i].x * cell + cell * 0.5, pathStack[i].y * cell + cell * 0.5);
+      pctx.stroke();
+    }
+
+    if (playerPos) {
+      pctx.fillStyle = colorPrint ? '#d97706' : '#444';
+      pctx.beginPath();
+      pctx.arc(playerPos.x * cell + cell * 0.5, playerPos.y * cell + cell * 0.5, Math.max(2, cell * 0.28), 0, Math.PI * 2);
+      pctx.fill();
+    }
+  }
 
   document.getElementById('printImg').src = pc.toDataURL('image/png');
   window.print();
