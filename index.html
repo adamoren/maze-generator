@@ -321,6 +321,20 @@
   .history-row .hl { font-weight: 700; color: #1e1b4b; }
   .history-row .hr { color: #9ca3af; }
   .history-row .ht { color: #7c3aed; font-weight: 600; }
+  .record-badge { font-size: 0.78rem; background: #fef9c3; color: #854d0e; border-radius: 6px; padding: 2px 6px; font-weight: 700; }
+
+  .bests-section { margin-bottom: 16px; }
+  .bests-section h4 { font-size: 0.72rem; font-weight: 700; color: #9ca3af; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+  .bests-list { display: flex; flex-direction: column; gap: 6px; }
+  .bests-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; background: #fef9c3; border-radius: 10px;
+    font-size: 0.85rem;
+  }
+  .bests-row .bl { font-weight: 700; color: #1e1b4b; min-width: 70px; }
+  .bests-row .bv { color: #854d0e; font-weight: 600; }
+
+  .history-section-title { font-size: 0.72rem; font-weight: 700; color: #9ca3af; letter-spacing: 0.08em; text-transform: uppercase; margin: 14px 0 8px; }
 
 #printImg { display: none; }
 
@@ -448,14 +462,31 @@ function setName(name) {
   loadHistory();
 }
 
+function fmtTime(s) {
+  const m = Math.floor(s / 60);
+  return m ? `${m}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
+}
+
 async function recordSolve(level, timeSeconds, moveCount) {
-  if (!playerName) return;
+  if (!playerName) return {};
+  const res = await fetch(
+    `${API}?player_name=eq.${encodeURIComponent(playerName)}&level=eq.${level}&select=time_seconds,move_count`,
+    { headers: HEADERS }
+  );
+  const existing = await res.json();
+  const prevBestTime  = existing.length ? Math.min(...existing.map(r => r.time_seconds)) : null;
+  const prevBestMoves = existing.length ? Math.min(...existing.map(r => r.move_count))   : null;
+  const newTimeRecord  = prevBestTime  === null || timeSeconds < prevBestTime;
+  const newMovesRecord = prevBestMoves === null || moveCount   < prevBestMoves;
+  const firstSolve     = prevBestTime  === null;
+
   await fetch(API, {
     method: 'POST',
     headers: HEADERS,
     body: JSON.stringify({ player_name: playerName, level, time_seconds: timeSeconds, move_count: moveCount })
   });
   loadHistory();
+  return { newTimeRecord, newMovesRecord, firstSolve };
 }
 
 async function loadHistory() {
@@ -463,7 +494,7 @@ async function loadHistory() {
   document.getElementById('historyPanel').style.display = 'block';
   document.getElementById('historyTitle').textContent = `${playerName}'s solved mazes`;
   const res = await fetch(
-    `${API}?player_name=eq.${encodeURIComponent(playerName)}&order=solved_at.desc&limit=50`,
+    `${API}?player_name=eq.${encodeURIComponent(playerName)}&order=solved_at.desc&limit=200`,
     { headers: HEADERS }
   );
   const rows = await res.json();
@@ -472,18 +503,43 @@ async function loadHistory() {
     body.innerHTML = '<p class="history-empty">No mazes solved yet — go get one! 🏆</p>';
     return;
   }
-  body.innerHTML = `<div class="history-list">${rows.map(r => {
-    const mins = Math.floor(r.time_seconds / 60);
-    const secs = String(r.time_seconds % 60).padStart(2, '0');
-    const time = mins ? `${mins}:${secs}` : `${r.time_seconds}s`;
+
+  // Compute personal bests per level
+  const bests = {};
+  for (const r of rows) {
+    if (!bests[r.level]) bests[r.level] = { time: r.time_seconds, moves: r.move_count };
+    else {
+      bests[r.level].time  = Math.min(bests[r.level].time,  r.time_seconds);
+      bests[r.level].moves = Math.min(bests[r.level].moves, r.move_count);
+    }
+  }
+  const levels = Object.keys(bests).map(Number).sort((a, b) => a - b);
+  const bestsHTML = `<div class="bests-section">
+    <h4>🏆 Personal Records</h4>
+    <div class="bests-list">${levels.map(lv => `
+      <div class="bests-row">
+        <span class="bl">Maze #${lv}</span>
+        <span class="bv">⏱ ${fmtTime(bests[lv].time)}</span>
+        <span class="bv">👟 ${bests[lv].moves} moves</span>
+      </div>`).join('')}
+    </div>
+  </div>`;
+
+  const recentHTML = `<p class="history-section-title">Recent solves</p>
+  <div class="history-list">${rows.slice(0, 50).map(r => {
+    const b = bests[r.level];
+    const isRecordTime  = r.time_seconds === b.time;
+    const isRecordMoves = r.move_count   === b.moves;
     const date = new Date(r.solved_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     return `<div class="history-row">
       <span class="hl">Maze #${r.level}</span>
-      <span class="ht">⏱ ${time}</span>
-      <span class="ht">👟 ${r.move_count} moves</span>
+      <span class="ht">⏱ ${fmtTime(r.time_seconds)}${isRecordTime  ? ' <span class="record-badge">PB</span>' : ''}</span>
+      <span class="ht">👟 ${r.move_count} moves${isRecordMoves ? ' <span class="record-badge">PB</span>' : ''}</span>
       <span class="hr">${date}</span>
     </div>`;
   }).join('')}</div>`;
+
+  body.innerHTML = bestsHTML + recentHTML;
 }
 
 document.getElementById('nameSubmit').addEventListener('click', () => {
@@ -792,7 +848,6 @@ document.addEventListener('keydown', e => {
   if (x === cols - 1 && y === rows - 1) {
     playerPos = null;
     const elapsed = mazeStartTime ? Math.round((Date.now() - mazeStartTime) / 1000) : 0;
-    recordSolve(lastMazeData.level, elapsed, moveCount);
     const puns = [
       '🌟 A-MAZE-ing!', '✨ Mazemerizing!', '🏆 Un-be-MAZE-able!',
       '🎊 Corridor-ulations!', '🚪 Exit-cellent work!', '🧱 Wall done!',
@@ -804,7 +859,16 @@ document.addEventListener('keydown', e => {
       '🛤️ A true path-finder!', '🌀 You spiraled straight to victory!',
       '🎯 Dead-end dodger extraordinaire!', '🤯 That was TURN-mendous!',
     ];
-    overlay.textContent = puns[Math.floor(Math.random() * puns.length)] + ' Click to dismiss';
+    const pun = puns[Math.floor(Math.random() * puns.length)];
+    recordSolve(lastMazeData.level, elapsed, moveCount).then(({ newTimeRecord, newMovesRecord, firstSolve }) => {
+      const records = firstSolve ? '🥇 First solve — it\'s all records from here!'
+        : (newTimeRecord && newMovesRecord) ? '🏆 New personal best — time AND moves!'
+        : newTimeRecord  ? `⏱ New best time! (${fmtTime(elapsed)})`
+        : newMovesRecord ? `👟 New best moves! (${moveCount})`
+        : '';
+      overlay.innerHTML = `<div style="text-align:center">${pun}<br><span style="font-size:0.85em;opacity:0.85">${records || 'Click to dismiss'}</span>${records ? '<br><span style="font-size:0.75em;opacity:0.6">Click to dismiss</span>' : ''}</div>`;
+    });
+    overlay.innerHTML = `<div style="text-align:center">${pun}<br><span style="font-size:0.75em;opacity:0.7">Click to dismiss</span></div>`;
     overlay.classList.add('visible');
   }
 });
