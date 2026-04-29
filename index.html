@@ -476,7 +476,7 @@ async function loadHistory() {
     const mins = Math.floor(r.time_seconds / 60);
     const secs = String(r.time_seconds % 60).padStart(2, '0');
     const time = mins ? `${mins}:${secs}` : `${r.time_seconds}s`;
-    const date = new Date(r.solved_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const date = new Date(r.solved_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     return `<div class="history-row">
       <span class="hl">Maze #${r.level}</span>
       <span class="ht">⏱ ${time}</span>
