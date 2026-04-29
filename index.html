@@ -264,6 +264,64 @@
 
   .welcome-card strong { color: #e2e8f0; }
 
+  /* Name modal */
+  #nameModal {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(15,23,42,0.65);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+    backdrop-filter: blur(4px);
+  }
+  .name-card {
+    background: white; border-radius: 24px; padding: 40px;
+    max-width: 400px; width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    text-align: center;
+  }
+  .name-card h2 { font-size: 1.6rem; font-weight: 800; color: #1e1b4b; margin-bottom: 8px; }
+  .name-card p  { font-size: 0.9rem; color: #9ca3af; margin-bottom: 24px; }
+  .name-input {
+    width: 100%; padding: 14px 18px; font-size: 1.1rem; font-weight: 600;
+    border: 2px solid #ddd6fe; border-radius: 14px; outline: none;
+    color: #1e1b4b; text-align: center; margin-bottom: 16px;
+    font-family: inherit;
+  }
+  .name-input:focus { border-color: #7c3aed; }
+  .name-submit {
+    width: 100%; padding: 14px; background: #7c3aed; color: white;
+    border: none; border-radius: 999px; font-size: 1rem; font-weight: 700;
+    cursor: pointer; transition: opacity 0.15s;
+  }
+  .name-submit:hover { opacity: 0.88; }
+
+  /* History panel */
+  #historyPanel {
+    width: 100%; max-width: 600px; margin-top: 32px;
+    background: white; border-radius: 20px;
+    padding: 24px 28px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+  .history-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .history-header h3 { font-size: 1rem; font-weight: 700; color: #1e1b4b; }
+  .history-name {
+    font-size: 0.8rem; color: #9ca3af; cursor: pointer;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+  .history-name:hover { color: #7c3aed; }
+  .history-empty { font-size: 0.88rem; color: #9ca3af; text-align: center; padding: 8px 0; }
+  .history-list { display: flex; flex-direction: column; gap: 8px; }
+  .history-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: #f5f3ff; border-radius: 12px;
+    font-size: 0.88rem;
+  }
+  .history-row .hl { font-weight: 700; color: #1e1b4b; }
+  .history-row .hr { color: #9ca3af; }
+  .history-row .ht { color: #7c3aed; font-weight: 600; }
+
 #printImg { display: none; }
 
   @media print {
@@ -278,6 +336,15 @@
 </style>
 </head>
 <body>
+
+<div id="nameModal" style="display:none">
+  <div class="name-card">
+    <h2>👋 Welcome!</h2>
+    <p>What's your name? We'll keep track of the mazes you solve.</p>
+    <input class="name-input" id="nameInput" type="text" placeholder="Your name" maxlength="30" autocomplete="off">
+    <button class="name-submit" id="nameSubmit">Let's go! 🚀</button>
+  </div>
+</div>
 
 <h1>🌀 Maze Generator</h1>
 <p class="subtitle">Pick a number — the higher the harder</p>
@@ -331,6 +398,14 @@
   </label>
 </div>
 
+<div id="historyPanel" style="display:none">
+  <div class="history-header">
+    <h3 id="historyTitle">Your solved mazes</h3>
+    <span class="history-name" id="changeNameBtn">Not you?</span>
+  </div>
+  <div id="historyBody"><p class="history-empty">No mazes solved yet — go get one! 🏆</p></div>
+</div>
+
 <div id="settingsModal" style="display:none">
   <div class="settings-card">
     <h2>⚙ Settings</h2>
@@ -353,12 +428,83 @@
 </div>
 
 <script>
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzQxNjAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.c268E4RcBcm4T76VRwx5NENKRWaAtXAQcZtq30A6-bM';
+const API      = '/rest/v1/maze_history';
+const HEADERS  = { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' };
+
+// ── Player name & history ─────────────────────────────────────────────────
+let playerName = localStorage.getItem('mazeName') || null;
+
+function showNameModal() {
+  document.getElementById('nameModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('nameInput').focus(), 50);
+}
+
+function setName(name) {
+  playerName = name.trim();
+  localStorage.setItem('mazeName', playerName);
+  document.getElementById('nameModal').style.display = 'none';
+  document.getElementById('historyTitle').textContent = `${playerName}'s solved mazes`;
+  loadHistory();
+}
+
+async function recordSolve(level, timeSeconds) {
+  if (!playerName) return;
+  await fetch(API, {
+    method: 'POST',
+    headers: HEADERS,
+    body: JSON.stringify({ player_name: playerName, level, time_seconds: timeSeconds })
+  });
+  loadHistory();
+}
+
+async function loadHistory() {
+  if (!playerName) return;
+  document.getElementById('historyPanel').style.display = 'block';
+  document.getElementById('historyTitle').textContent = `${playerName}'s solved mazes`;
+  const res = await fetch(
+    `${API}?player_name=eq.${encodeURIComponent(playerName)}&order=solved_at.desc&limit=50`,
+    { headers: HEADERS }
+  );
+  const rows = await res.json();
+  const body = document.getElementById('historyBody');
+  if (!rows.length) {
+    body.innerHTML = '<p class="history-empty">No mazes solved yet — go get one! 🏆</p>';
+    return;
+  }
+  body.innerHTML = `<div class="history-list">${rows.map(r => {
+    const mins = Math.floor(r.time_seconds / 60);
+    const secs = String(r.time_seconds % 60).padStart(2, '0');
+    const time = mins ? `${mins}:${secs}` : `${r.time_seconds}s`;
+    const date = new Date(r.solved_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return `<div class="history-row">
+      <span class="hl">Maze #${r.level}</span>
+      <span class="ht">⏱ ${time}</span>
+      <span class="hr">${date}</span>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+document.getElementById('nameSubmit').addEventListener('click', () => {
+  const v = document.getElementById('nameInput').value.trim();
+  if (v) setName(v);
+});
+document.getElementById('nameInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { const v = e.target.value.trim(); if (v) setName(v); }
+});
+document.getElementById('changeNameBtn').addEventListener('click', () => {
+  document.getElementById('nameInput').value = playerName || '';
+  showNameModal();
+});
+
+// ── Maze state ────────────────────────────────────────────────────────────
 const numInput = document.getElementById('numInput');
 const genBtn   = document.getElementById('genBtn');
 const printBtn = document.getElementById('printBtn');
 const canvas   = document.getElementById('maze');
 const ctx      = canvas.getContext('2d');
 const overlay  = document.getElementById('overlay');
+let mazeStartTime = null;
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
@@ -642,6 +788,8 @@ document.addEventListener('keydown', e => {
 
   if (x === cols - 1 && y === rows - 1) {
     playerPos = null;
+    const elapsed = mazeStartTime ? Math.round((Date.now() - mazeStartTime) / 1000) : 0;
+    recordSolve(lastMazeData.level, elapsed);
     overlay.textContent = '🎉 Solved! Click to dismiss';
     overlay.classList.add('visible');
   }
@@ -675,6 +823,7 @@ function draw(level) {
 
     renderMaze(ctx, W, H, cell, maze.southWall, maze.eastWall, false, false);
     initPlayer();
+    mazeStartTime = Date.now();
 
     overlay.classList.remove('visible');
     genBtn.disabled   = false;
@@ -817,6 +966,14 @@ document.getElementById('zoomOutBtn').addEventListener('click', () => {
   zoomIdx = 0;
   applyZoom();
 });
+
+// Init: show name modal or load existing history
+if (!playerName) {
+  showNameModal();
+} else {
+  document.getElementById('historyTitle').textContent = `${playerName}'s solved mazes`;
+  loadHistory();
+}
 
 numInput.addEventListener('keydown', e => { if (e.key === 'Enter') genBtn.click(); });
 
