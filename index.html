@@ -399,7 +399,9 @@
   <button id="zoomOutBtn" style="position:absolute;bottom:16px;right:16px;z-index:20;display:none;background:rgba(30,27,74,0.82);color:white;border:none;border-radius:999px;padding:9px 20px;font-size:0.85rem;font-weight:700;cursor:pointer;box-shadow:0 2px 14px rgba(0,0,0,0.35);backdrop-filter:blur(6px)">↙ Zoom out</button>
 </div>
 
-<div id="recordStrip" style="display:none;font-size:0.82rem;color:#6d6a85;margin-top:10px;display:none;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center">
+<div id="recordStrip" style="display:none;font-size:0.82rem;color:#6d6a85;margin-top:10px;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center">
+  <span id="liveClock" style="font-size:1.4rem;font-weight:800;color:#1e1b4b;letter-spacing:0.04em;min-width:60px;text-align:center">0:00</span>
+  <span style="color:#d1d5db">|</span>
   <span>🏆 To beat:</span>
   <span id="recordTime" style="color:#7c3aed;font-weight:600"></span>
   <span id="recordMoves" style="color:#7c3aed;font-weight:600"></span>
@@ -592,6 +594,27 @@ const ctx      = canvas.getContext('2d');
 const overlay  = document.getElementById('overlay');
 let mazeStartTime = null;
 let moveCount = 0;
+let clockInterval = null;
+
+function startClock() {
+  if (mazeStartTime) return;
+  mazeStartTime = Date.now();
+  clockInterval = setInterval(() => {
+    const s = Math.floor((Date.now() - mazeStartTime) / 1000);
+    document.getElementById('liveClock').textContent = fmtTime(s);
+  }, 500);
+}
+
+function stopClock() {
+  clearInterval(clockInterval);
+  clockInterval = null;
+}
+
+function resetClock() {
+  stopClock();
+  mazeStartTime = null;
+  document.getElementById('liveClock').textContent = '0:00';
+}
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
@@ -855,6 +878,7 @@ document.addEventListener('keydown', e => {
   else return;
 
   e.preventDefault();
+  startClock();
   moveCount++;
   const prev = playerPos;
   playerPos = { x, y };
@@ -877,6 +901,7 @@ document.addEventListener('keydown', e => {
   if (x === cols - 1 && y === rows - 1) {
     playerPos = null;
     const elapsed = mazeStartTime ? Math.round((Date.now() - mazeStartTime) / 1000) : 0;
+    stopClock();
     const puns = [
       '🌟 A-MAZE-ing!', '✨ Mazemerizing!', '🏆 Un-be-MAZE-able!',
       '🎊 Corridor-ulations!', '🚪 Exit-cellent work!', '🧱 Wall done!',
@@ -930,7 +955,7 @@ function draw(level) {
 
     renderMaze(ctx, W, H, cell, maze.southWall, maze.eastWall, false, false);
     initPlayer();
-    mazeStartTime = Date.now();
+    resetClock();
     moveCount = 0;
     showLevelRecord(level);
 
