@@ -318,19 +318,20 @@
   .history-row .hr { color: #9ca3af; }
   .history-row .ht { color: #7c3aed; font-weight: 600; }
   .record-badge { font-size: 0.78rem; background: #fef9c3; color: #854d0e; border-radius: 6px; padding: 2px 6px; font-weight: 700; }
+  .history-date-header { font-size: 0.72rem; font-weight: 700; color: #9ca3af; letter-spacing: 0.06em; text-transform: uppercase; padding: 12px 2px 4px; }
 
-  .bests-section { margin-bottom: 16px; }
-  .bests-section h4 { font-size: 0.72rem; font-weight: 700; color: #9ca3af; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
-  .bests-list { display: flex; flex-direction: column; gap: 6px; }
-  .bests-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px 12px; background: #fef9c3; border-radius: 10px;
-    font-size: 0.85rem;
-  }
-  .bests-row .bl { font-weight: 700; color: #1e1b4b; min-width: 70px; }
-  .bests-row .bv { color: #854d0e; font-weight: 600; }
-
-  .history-section-title { font-size: 0.72rem; font-weight: 700; color: #9ca3af; letter-spacing: 0.08em; text-transform: uppercase; margin: 14px 0 8px; }
+  /* Calendar */
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-title { font-weight: 700; color: #1e1b4b; font-size: 0.95rem; }
+  .cal-btn { background: none; border: none; cursor: pointer; color: #7c3aed; font-size: 1rem; padding: 4px 10px; border-radius: 8px; }
+  .cal-btn:hover { background: #f5f3ff; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 20px; }
+  .cal-dow { text-align: center; font-size: 0.68rem; font-weight: 700; color: #9ca3af; padding: 4px 0; }
+  .cal-day { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 2px; font-size: 0.82rem; border-radius: 8px; }
+  .cal-day.cal-today { background: #f5f3ff; font-weight: 700; color: #7c3aed; }
+  .cal-day.cal-has-solve { cursor: pointer; font-weight: 600; }
+  .cal-day.cal-has-solve:hover { background: #ede9fe; }
+  .cal-dot { width: 5px; height: 5px; background: #7c3aed; border-radius: 50%; }
 
 #printImg { display: none; }
 
@@ -514,61 +515,102 @@ async function recordSolve(level, timeSeconds, moveCount) {
     headers: HEADERS,
     body: JSON.stringify({ player_name: playerName, level, time_seconds: timeSeconds, move_count: moveCount })
   });
-  loadHistory();
   if (newTimeRecord || newMovesRecord) showLevelRecord(level);
+  loadHistory();
   return { newTimeRecord, newMovesRecord, firstSolve };
+}
+
+let historyRows = [];
+let calYear, calMonth;
+
+function renderCalendar() {
+  const today = new Date();
+  const firstDow  = new Date(calYear, calMonth, 1).getDay();
+  const daysInMon = new Date(calYear, calMonth + 1, 0).getDate();
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  const solvedDays = new Set();
+  for (const r of historyRows) {
+    const d = new Date(r.solved_at);
+    if (d.getFullYear() === calYear && d.getMonth() === calMonth) solvedDays.add(d.getDate());
+  }
+
+  let g = '<div class="cal-nav">'
+    + '<button class="cal-btn" id="calPrev">◀</button>'
+    + `<span class="cal-title">${MONTHS[calMonth]} ${calYear}</span>`
+    + '<button class="cal-btn" id="calNext">▶</button>'
+    + '</div><div class="cal-grid">'
+    + ['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  for (let i = 0; i < firstDow; i++) g += '<div></div>';
+  for (let d = 1; d <= daysInMon; d++) {
+    const has = solvedDays.has(d);
+    const isToday = today.getFullYear() === calYear && today.getMonth() === calMonth && today.getDate() === d;
+    const dateId  = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    g += `<div class="cal-day${has ? ' cal-has-solve' : ''}${isToday ? ' cal-today' : ''}"${has ? ` data-date="${dateId}"` : ''}>${d}${has ? '<span class="cal-dot"></span>' : ''}</div>`;
+  }
+  g += '</div>';
+  return g;
+}
+
+function renderHistoryList() {
+  if (!historyRows.length) return '<p class="history-empty">No mazes solved yet — go get one! 🏆</p>';
+
+  const bests = {};
+  for (const r of historyRows) {
+    if (!bests[r.level]) bests[r.level] = { time: r.time_seconds, moves: r.move_count };
+    else { bests[r.level].time = Math.min(bests[r.level].time, r.time_seconds); bests[r.level].moves = Math.min(bests[r.level].moves, r.move_count); }
+  }
+
+  let html = '<div class="history-list">';
+  let lastDateLabel = null;
+  for (const r of historyRows) {
+    const d    = new Date(r.solved_at);
+    const dateId    = d.toISOString().slice(0, 10);
+    const dateLabel = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    if (dateLabel !== lastDateLabel) {
+      html += `<div class="history-date-header" id="date-${dateId}">${dateLabel}</div>`;
+      lastDateLabel = dateLabel;
+    }
+    const b = bests[r.level];
+    const pbTime  = r.time_seconds === b.time;
+    const pbMoves = r.move_count   === b.moves;
+    const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    html += `<div class="history-row">
+      <span class="hl">Maze #${r.level}</span>
+      <span class="ht">⏱ ${fmtTime(r.time_seconds)}${pbTime  ? ' <span class="record-badge">PB</span>' : ''}</span>
+      <span class="ht">👟 ${r.move_count}${pbMoves ? ' <span class="record-badge">PB</span>' : ''}</span>
+      <span class="hr">${time}</span>
+    </div>`;
+  }
+  return html + '</div>';
+}
+
+function paintHistory() {
+  const body = document.getElementById('historyBody');
+  body.innerHTML = renderCalendar() + renderHistoryList();
+  document.getElementById('calPrev').onclick = () => { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } paintHistory(); };
+  document.getElementById('calNext').onclick = () => { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } paintHistory(); };
+  body.querySelectorAll('.cal-day.cal-has-solve').forEach(el => {
+    el.onclick = () => {
+      const target = body.querySelector(`#date-${el.dataset.date}`);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+  });
 }
 
 async function loadHistory() {
   if (!playerName) return;
   document.getElementById('historyTitle').textContent = `📜 ${playerName}'s Mazes`;
   const res = await fetch(
-    `${API}?player_name=eq.${encodeURIComponent(playerName)}&order=solved_at.desc&limit=200`,
+    `${API}?player_name=eq.${encodeURIComponent(playerName)}&order=solved_at.desc&limit=500`,
     { headers: HEADERS }
   );
-  const rows = await res.json();
-  const body = document.getElementById('historyBody');
-  if (!rows.length) {
-    body.innerHTML = '<p class="history-empty">No mazes solved yet — go get one! 🏆</p>';
-    return;
-  }
-
-  // Compute personal bests per level
-  const bests = {};
-  for (const r of rows) {
-    if (!bests[r.level]) bests[r.level] = { time: r.time_seconds, moves: r.move_count };
-    else {
-      bests[r.level].time  = Math.min(bests[r.level].time,  r.time_seconds);
-      bests[r.level].moves = Math.min(bests[r.level].moves, r.move_count);
-    }
-  }
-  const levels = Object.keys(bests).map(Number).sort((a, b) => a - b);
-  const bestsHTML = `<div class="bests-section">
-    <h4>🏆 Personal Records</h4>
-    <div class="bests-list">${levels.map(lv => `
-      <div class="bests-row">
-        <span class="bl">Maze #${lv}</span>
-        <span class="bv">⏱ ${fmtTime(bests[lv].time)}</span>
-        <span class="bv">👟 ${bests[lv].moves} moves</span>
-      </div>`).join('')}
-    </div>
-  </div>`;
-
-  const recentHTML = `<p class="history-section-title">Recent solves</p>
-  <div class="history-list">${rows.slice(0, 50).map(r => {
-    const b = bests[r.level];
-    const isRecordTime  = r.time_seconds === b.time;
-    const isRecordMoves = r.move_count   === b.moves;
-    const date = new Date(r.solved_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-    return `<div class="history-row">
-      <span class="hl">Maze #${r.level}</span>
-      <span class="ht">⏱ ${fmtTime(r.time_seconds)}${isRecordTime  ? ' <span class="record-badge">PB</span>' : ''}</span>
-      <span class="ht">👟 ${r.move_count} moves${isRecordMoves ? ' <span class="record-badge">PB</span>' : ''}</span>
-      <span class="hr">${date}</span>
-    </div>`;
-  }).join('')}</div>`;
-
-  body.innerHTML = bestsHTML + recentHTML;
+  historyRows = await res.json();
+  const now = new Date();
+  calYear  = now.getFullYear();
+  calMonth = now.getMonth();
+  paintHistory();
 }
 
 document.getElementById('nameSubmit').addEventListener('click', () => {
