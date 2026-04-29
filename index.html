@@ -294,18 +294,14 @@
   }
   .name-submit:hover { opacity: 0.88; }
 
-  /* History panel */
-  #historyPanel {
-    width: 100%; max-width: 600px; margin-top: 32px;
-    background: white; border-radius: 20px;
-    padding: 24px 28px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  /* History modal */
+  #historyModal {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(15,23,42,0.65);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+    backdrop-filter: blur(4px);
   }
-  .history-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 16px;
-  }
-  .history-header h3 { font-size: 1rem; font-weight: 700; color: #1e1b4b; }
   .history-name {
     font-size: 0.8rem; color: #9ca3af; cursor: pointer;
     text-decoration: underline; text-underline-offset: 3px;
@@ -340,7 +336,7 @@
 
   @media print {
     body { background: white; padding: 0; align-items: center; justify-content: center; min-height: unset; }
-    h1, .subtitle, .controls, .legend, .overlay, #zoomOutBtn, #recordStrip, #historyPanel { display: none !important; }
+    h1, .subtitle, .controls, .legend, .overlay, #zoomOutBtn, #recordStrip, #historyModal { display: none !important; }
     #mazeOuter { position: static; }
     .canvas-wrap { border: none; box-shadow: none; border-radius: 0; max-height: none; overflow: visible; }
     canvas { display: none; }
@@ -411,7 +407,8 @@
   <div class="legend-item"><div class="dot dot-start"></div> Start</div>
   <div class="legend-item"><div class="dot dot-end"></div> Finish</div>
   <span style="font-size:0.8rem;color:#9ca3af;margin:0 4px">↑ ↓ ← → or WASD</span>
-  <button class="btn btn-secondary" id="printBtn" style="margin-left:8px">🖨️ Print</button>
+  <button class="btn btn-secondary" id="historyBtn" style="margin-left:8px">📜 History</button>
+  <button class="btn btn-secondary" id="printBtn">🖨️ Print</button>
   <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.85rem;color:#6d6a85;text-transform:none;letter-spacing:normal;margin-left:4px">
     <input type="checkbox" id="colorCheck"> Color print
   </label>
@@ -420,12 +417,15 @@
   </label>
 </div>
 
-<div id="historyPanel" style="display:none">
-  <div class="history-header">
-    <h3 id="historyTitle" style="cursor:pointer;user-select:none" id="historyToggle">Your solved mazes <span id="historyChevron" style="font-size:0.8em;color:#9ca3af">▲</span></h3>
-    <span class="history-name" id="changeNameBtn">Not you?</span>
+<div id="historyModal" style="display:none">
+  <div class="settings-card" style="max-width:560px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <h2 id="historyTitle">📜 Solved Mazes</h2>
+      <span class="history-name" id="changeNameBtn">Not you?</span>
+    </div>
+    <div id="historyBody" style="max-height:60vh;overflow-y:auto;margin-top:16px"><p class="history-empty">No mazes solved yet — go get one! 🏆</p></div>
+    <button class="settings-close" id="closeHistory">Done ✓</button>
   </div>
-  <div id="historyBody"><p class="history-empty">No mazes solved yet — go get one! 🏆</p></div>
 </div>
 
 <div id="settingsModal" style="display:none">
@@ -466,7 +466,6 @@ function setName(name) {
   playerName = name.trim();
   localStorage.setItem('mazeName', playerName);
   document.getElementById('nameModal').style.display = 'none';
-  document.getElementById('historyTitle').textContent = `${playerName}'s solved mazes`;
   loadHistory();
 }
 
@@ -522,8 +521,7 @@ async function recordSolve(level, timeSeconds, moveCount) {
 
 async function loadHistory() {
   if (!playerName) return;
-  document.getElementById('historyPanel').style.display = 'block';
-  document.getElementById('historyTitle').textContent = `${playerName}'s solved mazes`;
+  document.getElementById('historyTitle').textContent = `📜 ${playerName}'s Mazes`;
   const res = await fetch(
     `${API}?player_name=eq.${encodeURIComponent(playerName)}&order=solved_at.desc&limit=200`,
     { headers: HEADERS }
@@ -585,11 +583,16 @@ document.getElementById('changeNameBtn').addEventListener('click', () => {
   showNameModal();
 });
 
-let historyExpanded = true;
-document.getElementById('historyTitle').addEventListener('click', () => {
-  historyExpanded = !historyExpanded;
-  document.getElementById('historyBody').style.display = historyExpanded ? '' : 'none';
-  document.getElementById('historyChevron').textContent = historyExpanded ? '▲' : '▼';
+document.getElementById('historyBtn').addEventListener('click', () => {
+  loadHistory();
+  document.getElementById('historyModal').style.display = 'flex';
+});
+document.getElementById('closeHistory').addEventListener('click', () => {
+  document.getElementById('historyModal').style.display = 'none';
+});
+document.getElementById('historyModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('historyModal'))
+    document.getElementById('historyModal').style.display = 'none';
 });
 
 // ── Maze state ────────────────────────────────────────────────────────────
@@ -1112,7 +1115,6 @@ document.getElementById('zoomOutBtn').addEventListener('click', () => {
 if (!playerName) {
   showNameModal();
 } else {
-  document.getElementById('historyTitle').textContent = `${playerName}'s solved mazes`;
   loadHistory();
 }
 
