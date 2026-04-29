@@ -340,7 +340,7 @@
 
   @media print {
     body { background: white; padding: 0; align-items: center; justify-content: center; min-height: unset; }
-    h1, .subtitle, .controls, .legend, .overlay, #zoomOutBtn { display: none !important; }
+    h1, .subtitle, .controls, .legend, .overlay, #zoomOutBtn, #recordStrip, #historyPanel { display: none !important; }
     #mazeOuter { position: static; }
     .canvas-wrap { border: none; box-shadow: none; border-radius: 0; max-height: none; overflow: visible; }
     canvas { display: none; }
@@ -422,7 +422,7 @@
 
 <div id="historyPanel" style="display:none">
   <div class="history-header">
-    <h3 id="historyTitle">Your solved mazes</h3>
+    <h3 id="historyTitle" style="cursor:pointer;user-select:none" id="historyToggle">Your solved mazes <span id="historyChevron" style="font-size:0.8em;color:#9ca3af">▲</span></h3>
     <span class="history-name" id="changeNameBtn">Not you?</span>
   </div>
   <div id="historyBody"><p class="history-empty">No mazes solved yet — go get one! 🏆</p></div>
@@ -583,6 +583,13 @@ document.getElementById('nameInput').addEventListener('keydown', e => {
 document.getElementById('changeNameBtn').addEventListener('click', () => {
   document.getElementById('nameInput').value = playerName || '';
   showNameModal();
+});
+
+let historyExpanded = true;
+document.getElementById('historyTitle').addEventListener('click', () => {
+  historyExpanded = !historyExpanded;
+  document.getElementById('historyBody').style.display = historyExpanded ? '' : 'none';
+  document.getElementById('historyChevron').textContent = historyExpanded ? '▲' : '▼';
 });
 
 // ── Maze state ────────────────────────────────────────────────────────────
